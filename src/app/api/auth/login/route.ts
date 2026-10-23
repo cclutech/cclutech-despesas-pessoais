@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email ou palavra-passe incorretos." }, { status: 401 });
     }
     await createSession(user.id);
-    return NextResponse.json({ user: { id: user.id, email: user.email } });
+    return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email } });
   } catch (error) {
     return errorResponse(error, "Não foi possível iniciar sessão.");
   }

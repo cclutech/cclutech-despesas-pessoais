@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { initializeUserCategories } from "@/lib/categories";
 import { db } from "@/lib/db";
 import { authenticatedUser, errorResponse, validType } from "@/lib/http";
 
@@ -6,12 +7,27 @@ export async function GET() {
   const { user, response } = await authenticatedUser();
   if (response || !user) return response;
   try {
+    await initializeUserCategories(user.id);
     const categories = await db.category.findMany({
       where: { OR: [{ userId: user.id }, { userId: null }] },
       orderBy: [{ type: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, type: true, icon: true, isCustom: true },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        icon: true,
+        isCustom: true,
+        userId: true,
+        _count: { select: { transactions: { where: { userId: user.id } } } },
+      },
     });
-    return NextResponse.json({ categories });
+    return NextResponse.json({
+      categories: categories.map(({ _count, userId, ...category }) => ({
+        ...category,
+        canManage: userId === user.id,
+        transactionCount: _count.transactions,
+      })),
+    });
   } catch (error) {
     return errorResponse(error);
   }

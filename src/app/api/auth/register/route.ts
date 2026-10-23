@@ -8,9 +8,13 @@ import { errorResponse } from "@/lib/http";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const name = typeof body.name === "string" ? body.name.trim() : "";
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
 
+    if (!name || name.length > 100) {
+      return NextResponse.json({ error: "Introduza um nome com até 100 caracteres." }, { status: 400 });
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "Introduza um endereço de email válido." }, { status: 400 });
     }
@@ -23,11 +27,14 @@ export async function POST(request: NextRequest) {
 
     const user = await db.user.create({
       data: {
+        name,
         email,
         passwordHash: await bcrypt.hash(password, 12),
+        categoriesInitialized: true,
+        categoryDefaultsVersion: 2,
         categories: { create: defaultCategories.map((category) => ({ ...category, isCustom: false })) },
       },
-      select: { id: true, email: true },
+      select: { id: true, name: true, email: true },
     });
     await createSession(user.id);
     return NextResponse.json({ user }, { status: 201 });

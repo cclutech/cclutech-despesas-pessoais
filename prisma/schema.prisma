@@ -12,13 +12,23 @@ enum TransactionType {
   expense
 }
 
+enum SavingsMovementType {
+  deposit
+  withdrawal
+}
+
 model User {
   id           String        @id @default(cuid())
+  name         String        @default("")
   email        String        @unique
   passwordHash String
   createdAt    DateTime      @default(now())
+  categoriesInitialized Boolean @default(false)
+  categoryDefaultsVersion Int @default(0)
+  savingsMigratedAt DateTime?
   categories   Category[]
   transactions Transaction[]
+  savingsMovements SavingsMovement[]
 }
 
 model Category {
@@ -48,5 +58,21 @@ model Transaction {
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   category    Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
+  @@index([userId, date])
+}
+
+model SavingsMovement {
+  id                  String              @id @default(cuid())
+  userId              String
+  type                SavingsMovementType
+  amount              Decimal             @db.Decimal(12, 2)
+  date                DateTime            @default(now())
+  description         String?
+  idempotencyKey      String?
+  legacyTransactionId String?             @unique
+  createdAt           DateTime            @default(now())
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
   @@index([userId, date])
 }

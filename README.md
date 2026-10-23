@@ -26,14 +26,16 @@ Requer Node.js 20.9 ou superior e PostgreSQL.
 4. Crie/atualize as tabelas e gere o cliente Prisma: `npx prisma db push`
 5. Inicie a aplicação: `npm run dev`
 
-No primeiro registo são criadas automaticamente as categorias padrão da conta.
+No primeiro registo são criadas automaticamente as categorias padrão da conta. O nome informado no registo fica associado ao perfil e é utilizado na aplicação. A coluna de nome tem um valor predefinido vazio, pelo que as contas anteriores são preservadas sem alterar os restantes dados; os nomes dessas contas podem ser completados futuramente.
 
 ## Funcionalidades
 
-- Registo e início de sessão com passwords hashadas com bcrypt e cookie JWT `httpOnly`, `sameSite` e `secure` em produção.
+- Registo com nome, email e palavra-passe, além de início de sessão com passwords hashadas com bcrypt e cookie JWT `httpOnly`, `sameSite` e `secure` em produção.
 - Dados de transações e categorias personalizados isolados por utilizador.
 - Categorias padrão e categorias personalizadas para receitas e despesas.
-- Registo e eliminação de transações, com opção para reservar uma parte de cada receita como poupança.
+- Registo e eliminação de transações, com relatórios de receitas e despesas reais.
+- Transferências para poupanças e levantamentos com proteção contra saldos insuficientes; resumos e indicadores de poupança calculados apenas para o mês selecionado.
+- Migração automática e idempotente dos valores guardados na funcionalidade anterior "Poupado (Reservado)".
 - Resumo mensal, distribuição de despesas por categoria e exportação CSV.
 - Interface responsiva e valores formatados em euros (`pt-PT`).
 
