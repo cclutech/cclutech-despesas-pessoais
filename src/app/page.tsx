@@ -181,6 +181,9 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [modal, setModal] = useState<"transaction" | "category" | null>(null);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [deletingTransaction, setDeletingTransaction] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileNav, setMobileNav] = useState(false);
@@ -248,14 +251,19 @@ export default function Home() {
     await api("/api/auth/logout", { method: "POST" });
     setUser(null);
   }
-  async function deleteTransaction(id: string) {
-    if (!window.confirm("Queres mesmo eliminar esta transação?")) return;
+  async function confirmDeleteTransaction() {
+    if (!transactionToDelete || deletingTransaction) return;
+    setDeletingTransaction(true);
+    setDeleteError("");
     try {
-      await api(`/api/transactions/${id}`, { method: "DELETE" });
+      await api(`/api/transactions/${transactionToDelete.id}`, { method: "DELETE" });
+      setTransactionToDelete(null);
       setNotice({ kind: "success", message: "Transação eliminada." });
       await loadData();
     } catch (err) {
-      setNotice({ kind: "error", message: err instanceof Error ? err.message : "Não foi possível eliminar." });
+      setDeleteError(err instanceof Error ? err.message : "Não foi possível eliminar a transação.");
+    } finally {
+      setDeletingTransaction(false);
     }
   }
   function exportCsv() {
@@ -277,7 +285,7 @@ export default function Home() {
       <div className="transaction-description"><strong>{item.description || item.category.name}</strong><span>{item.category.name} <i>·</i> {dateFormat.format(new Date(item.date))}</span></div>
       {item.savings > 0 && <span className="saved-pill">+{euro.format(item.savings)} poupado</span>}
       <strong className={`transaction-amount ${item.type}`}>{item.type === "income" ? "+" : "−"}{euro.format(item.amount)}</strong>
-      {removable && <button className="icon-button delete-button" aria-label="Eliminar transação" onClick={() => void deleteTransaction(item.id)}><Trash2 size={16} /></button>}
+      {removable && <button className="icon-button delete-button" aria-label={`Eliminar ${item.description || item.category.name}`} onClick={() => { setDeleteError(""); setTransactionToDelete(item); }}><Trash2 size={16} /></button>}
     </div>
   );
 
@@ -337,5 +345,16 @@ export default function Home() {
     </main>
     {modal === "transaction" && <TransactionForm categories={categories} onClose={() => setModal(null)} onSaved={() => { setNotice({ kind: "success", message: "Transação guardada com sucesso." }); void loadData(); }} />}
     {modal === "category" && <CategoryForm onClose={() => setModal(null)} onSaved={() => { setNotice({ kind: "success", message: "Categoria criada com sucesso." }); void loadData(); }} />}
+    {transactionToDelete && <AppModal title="Eliminar transação?" subtitle="Esta ação não pode ser anulada." onClose={() => { if (!deletingTransaction) setTransactionToDelete(null); }}>
+      <div className="delete-confirmation">
+        <span className="delete-confirmation-icon"><Trash2 size={19} /></span>
+        <p>Queres mesmo eliminar <strong>{transactionToDelete.description || transactionToDelete.category.name}</strong> no valor de <strong>{euro.format(transactionToDelete.amount)}</strong>?</p>
+      </div>
+      {deleteError && <div className="inline-error">{deleteError}</div>}
+      <div className="delete-confirmation-actions">
+        <button className="button button-secondary" disabled={deletingTransaction} onClick={() => setTransactionToDelete(null)}>Cancelar</button>
+        <button className="button button-danger" disabled={deletingTransaction} onClick={() => void confirmDeleteTransaction()}><Trash2 size={15} />{deletingTransaction ? "A eliminar..." : "Eliminar transação"}</button>
+      </div>
+    </AppModal>}
   </div>;
 }

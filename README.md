@@ -2,12 +2,23 @@
 
 Aplicação web em português para registar despesas, receitas e poupanças em euros. Construída com Next.js, React, Tailwind CSS, Prisma e PostgreSQL.
 
-## Requisitos
+## Executar com Docker (recomendado para testar)
 
-- Node.js 20.9 ou superior
-- PostgreSQL
+Requer Docker Desktop ou Docker Engine com Docker Compose. Na raiz do projeto, execute:
 
-## Configuração
+```bash
+docker compose up --build
+```
+
+Quando o PostgreSQL estiver pronto, a aplicação gera o cliente Prisma, cria/atualiza as tabelas e inicia em modo de desenvolvimento. Abra [http://localhost:3000](http://localhost:3000) e crie uma conta. Os dados da base de dados ficam guardados no volume Docker `postgres_data`.
+
+Para parar os serviços, use `Ctrl+C` e depois `docker compose down`. Para apagar também os dados guardados e começar de novo, execute `docker compose down -v`.
+
+O container de desenvolvimento usa credenciais locais predefinidas. Não as reutilize num ambiente público ou de produção. Para substituir o segredo de sessão, defina `SESSION_SECRET` no ambiente antes de iniciar o Compose.
+
+## Executar sem Docker
+
+Requer Node.js 20.9 ou superior e PostgreSQL.
 
 1. Instale as dependências: `npm install`
 2. Copie `.env.example` para `.env` e configure `DATABASE_URL`.
@@ -15,7 +26,7 @@ Aplicação web em português para registar despesas, receitas e poupanças em e
 4. Crie/atualize as tabelas e gere o cliente Prisma: `npx prisma db push`
 5. Inicie a aplicação: `npm run dev`
 
-Abra [http://localhost:3000](http://localhost:3000). No primeiro registo são criadas automaticamente as categorias padrão da conta.
+No primeiro registo são criadas automaticamente as categorias padrão da conta.
 
 ## Funcionalidades
 
