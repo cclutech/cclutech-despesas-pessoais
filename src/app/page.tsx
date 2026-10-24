@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Cell, Pie, PieChart, ResponsiveContainer, Tooltip,
+  Cell, Pie, PieChart, ResponsiveContainer,
 } from "recharts";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { defaultExpenseCategories } from "@/lib/default-categories";
@@ -34,11 +34,12 @@ type SavingsData = {
 type User = { id: string; name?: string | null; email: string };
 type Tab = "overview" | "transactions" | "categories" | "savings";
 type Notice = { kind: "error" | "success"; message: string };
+type ExpenseGroup = { id: string; name: string; icon: string; amount: number; color: string };
 
 const euro = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" });
+const percentage = new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 1 });
 const monthName = new Intl.DateTimeFormat("pt-PT", { month: "long", year: "numeric" });
 const dateFormat = new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "short", year: "numeric" });
-const colors = ["#7656e8", "#39b994", "#f4a65b", "#ef7380", "#56a6db", "#d292d4", "#a5b367", "#f0cc63"];
 const iconComponents: Record<string, LucideIcon> = {
   BadgeEuro, Banknote, BriefcaseBusiness, Brush, BusFront, CarFront, CarTaxiFront, Cat,
   Gift, House, Landmark, Martini, PersonStanding, Phone, PiggyBank, Shirt, ShoppingBasket,
@@ -308,6 +309,9 @@ export default function Home() {
   const [mobileNav, setMobileNav] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "income" | "expense">("all");
+  const [showAllExpenseGroups, setShowAllExpenseGroups] = useState(false);
+  const [hoveredExpenseId, setHoveredExpenseId] = useState<string | null>(null);
+  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
 
   const start = useMemo(() => new Date(month.getFullYear(), month.getMonth(), 1), [month]);
   const end = useMemo(() => new Date(month.getFullYear(), month.getMonth() + 1, 1), [month]);
@@ -329,19 +333,21 @@ export default function Home() {
   const expenses = monthTransactions.filter((item) => item.type === "expense").reduce((total, item) => total + item.amount, 0);
   const balance = income - expenses - monthSavingsBalance;
   const expenseGroups = useMemo(() => {
-    const groups = new Map<string, { name: string; icon: string; amount: number; color: string }>();
+    const groups = new Map<string, ExpenseGroup>();
     monthTransactions.filter((item) => item.type === "expense").forEach((item) => {
       const group = groups.get(item.category.id) || {
+        id: item.category.id,
         name: item.category.name,
         icon: item.category.icon,
         amount: 0,
-        color: expenseCategoryColors.get(item.category.icon) ?? colors[groups.size % colors.length],
+        color: categoryColor(item.category.icon),
       };
       group.amount += item.amount;
       groups.set(item.category.id, group);
     });
     return [...groups.values()].sort((a, b) => b.amount - a.amount);
   }, [monthTransactions]);
+  const activeExpense = expenseGroups.find((item) => item.id === (hoveredExpenseId ?? selectedExpenseId));
   const monthActivity = useMemo<ActivityItem[]>(() => {
     const savingsEntries = monthSavingsMovements.map((movement) => ({
       id: movement.id,
@@ -552,7 +558,46 @@ export default function Home() {
           </section>
           <section className="dashboard-grid">
             <article className="panel chart-panel"><div className="panel-heading"><div><h2>Despesas por categoria</h2><p>Onde foi o teu dinheiro</p></div><span className="panel-badge"><span className="summary-dot orange-dot" /> {monthTransactions.filter((item) => item.type === "expense").length} despesas</span></div>
-              {expenseGroups.length ? <div className="chart-layout"><div className="donut-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={expenseGroups} dataKey="amount" nameKey="name" innerRadius="70%" outerRadius="94%" paddingAngle={4} stroke="none" cornerRadius={5}>{expenseGroups.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip formatter={(value) => euro.format(Number(value))} contentStyle={{ border: "1px solid #eeedf3", borderRadius: 12, fontSize: 12, boxShadow: "0 8px 24px #25213914" }} /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{euro.format(expenses)}</strong><span>total gasto</span></div></div><div className="legend-list">{expenseGroups.slice(0, 6).map((item) => <div className="legend-item" key={item.name}><span className="legend-swatch" style={{ background: item.color }} /><span className="legend-name"><CategoryVisual icon={item.icon} size={13} /> &nbsp;{item.name}</span><strong>{euro.format(item.amount)}</strong></div>)}</div></div> : <div className="chart-empty"><span className="chart-empty-icon"><BarChart3 size={23} /></span><strong>O teu gráfico começa aqui</strong><p>Regista despesas para veres a distribuição por categoria.</p></div>}
+              {expenseGroups.length ? <div className="chart-layout">
+                <div className={`expense-tooltip${activeExpense ? " expense-tooltip-visible" : ""}`} role="status" aria-live="polite">
+                  {activeExpense && <><span className="expense-tooltip-name"><span className="legend-swatch" style={{ background: activeExpense.color }} />{activeExpense.name}</span><strong>{euro.format(activeExpense.amount)}</strong><span className="expense-tooltip-share">{percentage.format(expenses ? activeExpense.amount / expenses * 100 : 0)}% do total</span></>}
+                </div>
+                <div className="donut-wrap">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={expenseGroups}
+                        dataKey="amount"
+                        nameKey="name"
+                        innerRadius="70%"
+                        outerRadius="93%"
+                        paddingAngle={1.5}
+                        stroke="none"
+                        cornerRadius={3}
+                        activeShape={false}
+                        onMouseEnter={(_, index) => setHoveredExpenseId(expenseGroups[index]?.id ?? null)}
+                        onMouseLeave={() => setHoveredExpenseId(null)}
+                        onClick={(_, index) => setSelectedExpenseId((current) => current === expenseGroups[index]?.id ? null : expenseGroups[index]?.id ?? null)}
+                      >
+                        {expenseGroups.map((item) => (
+                          <Cell key={item.id} fill={item.color} opacity={activeExpense && activeExpense.id !== item.id ? 0.52 : 1} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="donut-center"><strong>{euro.format(expenses)}</strong><span>Total gasto</span></div>
+                </div>
+                <div className="legend-list" id="expense-category-list">
+                  {expenseGroups.slice(0, showAllExpenseGroups ? expenseGroups.length : 5).map((item) => (
+                    <div className="legend-item" key={item.id}>
+                      <span className="legend-swatch" style={{ background: item.color }} />
+                      <span className="legend-name"><CategoryVisual icon={item.icon} size={13} />{item.name}</span>
+                      <strong>{euro.format(item.amount)}</strong>
+                    </div>
+                  ))}
+                  {expenseGroups.length > 5 && <button type="button" className="legend-toggle" aria-expanded={showAllExpenseGroups} aria-controls="expense-category-list" onClick={() => setShowAllExpenseGroups((expanded) => !expanded)}>{showAllExpenseGroups ? "Ver menos" : "Ver todas"}<ChevronDown size={13} /></button>}
+                </div>
+              </div> : <div className="chart-empty"><span className="chart-empty-icon"><BarChart3 size={23} /></span><strong>O teu gráfico começa aqui</strong><p>Regista despesas para veres a distribuição por categoria.</p></div>}
             </article>
             <article className="panel recent-panel"><div className="panel-heading"><div><h2>Movimentos recentes</h2><p>Os últimos registos do mês</p></div><button className="text-link" onClick={() => setTab("transactions")}>Ver todos <ArrowRight size={14} /></button></div><div className="transaction-list">{recentTransactions.map((item) => renderTransaction(item))}{!recentTransactions.length && <div className="empty-state compact-empty"><span>🌱</span><strong>O primeiro passo é teu.</strong><p>Regista uma transação para começar.</p></div>}</div></article>
           </section>
